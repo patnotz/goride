@@ -12,9 +12,9 @@ import (
 	"strings"
 )
 
-const baseUrl = "https://www.strava.com/api/v3/"
+const baseUrl = "https://www.strava.com/api/v3"
 const authUrl = "https://www.strava.com/oauth/authorize"
-const clientId = "53956"
+const clientId = 53956
 const accessToken = "355aabb46aa2840403a73472e01f4421f946659f"
 
 func readClientSecret() (clientSecret string) {
@@ -25,9 +25,9 @@ func readClientSecret() (clientSecret string) {
 }
 
 func authHandler(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8") 
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	url := authUrl + "?client_id=53956&response_type=code&scope=activity:read_all&redirect_uri=https://localhost:9000/welcome"
-	fmt.Fprint(w, "<html><body>Click <a href=\"" + url + "\"><b>here</b></a> to Authenticate.</body></html>")
+	fmt.Fprint(w, "<html><body>Click <a href=\""+url+"\"><b>here</b></a> to Authenticate.</body></html>")
 }
 
 func welcomeHandler(w http.ResponseWriter, req *http.Request) {
@@ -42,6 +42,25 @@ func welcomeHandler(w http.ResponseWriter, req *http.Request) {
 
 	clientSecret := readClientSecret()
 	fmt.Println("clientSecret: " + clientSecret)
+
+	fmt.Println("Fetching auth tokens...")
+	client := &http.Client{}
+	resp, err := client.PostForm(baseUrl+"/oauth/token",
+		url.Values{
+			"client_id":     {fmt.Sprintf("%d", clientId)},
+			"client_secret": {clientSecret},
+			"code":          {authCode}})
+
+	errHandler(err)
+	bodyBytes, _ := ioutil.ReadAll(resp.Body)
+	var tokenDat map[string]interface{}
+	err = json.Unmarshal(bodyBytes, &tokenDat)
+	fmt.Println("tokenDat:")
+	fmt.Println(tokenDat)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	link := "https://localhost:9000/auth"
+	fmt.Fprint(w, "<html><body>Try again: <a href=\""+link+"\"/><b>"+link+"</b></a></body></html>")
 
 	fmt.Println("End: welcomeHandler")
 }
@@ -76,7 +95,7 @@ func makeRequest(url string) (dat map[string]interface{}) {
 func getAthleteData() (username string, athlete_id string) {
 	// Get Athlete data
 	fmt.Println("Getting athlete data...")
-	url := baseUrl + "athlete"
+	url := baseUrl + "/athlete"
 	dat := makeRequest(url)
 	fmt.Println(dat)
 
@@ -93,7 +112,7 @@ func getActivityData() {
 
 	// Get Activity data
 	fmt.Println("Getting activity data for " + username + " (" + athlete_id + ")")
-	url := baseUrl + "athlete/activities"
+	url := baseUrl + "/athlete/activities"
 	dat := makeRequest(url)
 	fmt.Println(dat)
 }
