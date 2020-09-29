@@ -1,3 +1,6 @@
+# Don't version control secret API keys
+strava_client_secret.txt
+    
 # Local certs for development
 goride.crt
 goride.csr
