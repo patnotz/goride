@@ -17,6 +17,44 @@ const authUrl = "https://www.strava.com/oauth/authorize"
 const clientId = 53956
 const accessToken = "355aabb46aa2840403a73472e01f4421f946659f"
 
+type AthleteData struct {
+	FirstName string
+	LastName  string
+	Id        float64
+	Username  string
+}
+
+type AuthContext struct {
+	AccessToken  string  `json:"access_token"`
+	RefreshToken string  `json:"refresh_token"`
+	ExpiresAt    float64 `json:"expires_at"`
+	ExpiresIn    float64 `json:"expires_in"`
+	Athlete      AthleteData
+}
+
+type Activity struct {
+	Name               string
+	Distance           float64
+	MovingTime         float64 `json:"moving_time"`
+	TotalElevationGain float64 `json:"total_elevation_gain"`
+	Type               string
+	Id                 float64
+	StartDate          string `json:"start_time"`
+	StartDateLocal     string `json:"start_date_local"`
+	Timezone           string
+	UtcOffset          float64 `json:"utc_offset"`
+	GearId             string  `json:"gear_id"`
+	Kilojoules         float64
+	SufferScore        float64 `json:"suffer_score"`
+}
+
+func printBytesAsStringMap(b []byte) {
+	var m map[string]interface{}
+	err := json.Unmarshal(b, &m)
+	errHandler(err)
+	fmt.Println(m)
+}
+
 func readClientSecret() (clientSecret string) {
 	contents, err := ioutil.ReadFile("strava_client_secret.txt")
 	errHandler(err)
@@ -53,15 +91,23 @@ func welcomeHandler(w http.ResponseWriter, req *http.Request) {
 
 	errHandler(err)
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
-	var tokenDat map[string]interface{}
-	err = json.Unmarshal(bodyBytes, &tokenDat)
-	fmt.Println("tokenDat:")
-	fmt.Println(tokenDat)
+	fmt.Println("response map:")
+	printBytesAsStringMap(bodyBytes)
+	var authContext AuthContext
+	err = json.Unmarshal(bodyBytes, &authContext)
+	errHandler(err)
+	fmt.Println("authContext:")
+	s, _ := json.MarshalIndent(authContext, "", "\t")
+	fmt.Println(string(s))
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	link := "https://localhost:9000/auth"
 	fmt.Fprint(w, "<html><body>Try again: <a href=\""+link+"\"/><b>"+link+"</b></a></body></html>")
 
+	activities := getActivityData(authContext)
+	fmt.Println(activities)
+	s, _ = json.MarshalIndent(activities, "", "\t")
+	fmt.Println(string(s))
 	fmt.Println("End: welcomeHandler")
 }
 
@@ -73,48 +119,31 @@ func errHandler(err error) {
 	}
 }
 
-func makeRequest(url string) (dat map[string]interface{}) {
+func makeRequest(url string, authContext AuthContext) (bodyBytes []byte) {
 	fmt.Println("fetching: " + url)
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
 	errHandler(err)
-	req.Header.Add("Authorization", ("Bearer " + accessToken))
-	req.Header.Add("activity", "read")
+	req.Header.Add("Authorization", ("Bearer " + authContext.AccessToken))
 	resp, err := client.Do(req)
 	errHandler(err)
 
 	defer resp.Body.Close()
-	body_bytes, err := ioutil.ReadAll(resp.Body)
-	errHandler(err)
-
-	err = json.Unmarshal(body_bytes, &dat)
+	bodyBytes, err = ioutil.ReadAll(resp.Body)
 	errHandler(err)
 	return
 }
 
-func getAthleteData() (username string, athlete_id string) {
-	// Get Athlete data
-	fmt.Println("Getting athlete data...")
-	url := baseUrl + "/athlete"
-	dat := makeRequest(url)
-	fmt.Println(dat)
-
-	// Unpack Athlete data
-	athlete_id = fmt.Sprintf("%.0f", dat["id"].(float64))
-	username = dat["username"].(string)
-	fmt.Println("Username  : " + username)
-	fmt.Println("Athlete ID: " + athlete_id)
-	return
-}
-
-func getActivityData() {
-	username, athlete_id := getAthleteData()
-
+func getActivityData(authContext AuthContext) (activities []Activity) {
 	// Get Activity data
+	username := authContext.Athlete.Username
+	athlete_id := fmt.Sprintf("%.0f", authContext.Athlete.Id)
 	fmt.Println("Getting activity data for " + username + " (" + athlete_id + ")")
 	url := baseUrl + "/athlete/activities"
-	dat := makeRequest(url)
-	fmt.Println(dat)
+	bodyBytes := makeRequest(url, authContext)
+	err := json.Unmarshal(bodyBytes, &activities)
+	errHandler(err)
+	return
 }
 
 func main() {
