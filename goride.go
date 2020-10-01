@@ -9,13 +9,17 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
 const baseUrl = "https://www.strava.com/api/v3"
 const authUrl = "https://www.strava.com/oauth/authorize"
 const clientId = 53956
-const accessToken = "355aabb46aa2840403a73472e01f4421f946659f"
+const activitiesPerPage = 30
+const metersPerMile = 1609.344
+const feetPerMeter = 3.2808399
+const secondsPerHour = 3200.0
 
 type AthleteData struct {
 	FirstName string
@@ -69,17 +73,12 @@ func authHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func welcomeHandler(w http.ResponseWriter, req *http.Request) {
-	fmt.Println("Begin: welcomeHandler")
-	fmt.Println("RawQuery = " + req.URL.RawQuery)
 	dat, err := url.ParseQuery(req.URL.RawQuery)
 	errHandler(err)
-	fmt.Println("dat:")
-	fmt.Println(dat)
 	authCode := dat["code"][0]
-	fmt.Println("Your authorization code is ", authCode)
+	fmt.Println("Your authorization code is", authCode)
 
 	clientSecret := readClientSecret()
-	fmt.Println("clientSecret: " + clientSecret)
 
 	fmt.Println("Fetching auth tokens...")
 	client := &http.Client{}
@@ -91,8 +90,6 @@ func welcomeHandler(w http.ResponseWriter, req *http.Request) {
 
 	errHandler(err)
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
-	fmt.Println("response map:")
-	printBytesAsStringMap(bodyBytes)
 	var authContext AuthContext
 	err = json.Unmarshal(bodyBytes, &authContext)
 	errHandler(err)
@@ -105,10 +102,21 @@ func welcomeHandler(w http.ResponseWriter, req *http.Request) {
 	fmt.Fprint(w, "<html><body>Try again: <a href=\""+link+"\"/><b>"+link+"</b></a></body></html>")
 
 	activities := getActivityData(authContext)
-	fmt.Println(activities)
-	s, _ = json.MarshalIndent(activities, "", "\t")
-	fmt.Println(string(s))
-	fmt.Println("End: welcomeHandler")
+	fmt.Printf("Found %d Rides:\n", len(activities))
+	total_distance_mi := 0.0
+	total_elevation_gain_ft := 0.0
+	for i, activity := range activities {
+		name := activity.Name
+		dist_mi := activity.Distance / metersPerMile
+		elev_ft := activity.TotalElevationGain * feetPerMeter
+		fmt.Printf("%3d. %s - %.2f miles, %.0f ft\n", i, name, dist_mi, elev_ft)
+		total_distance_mi += activity.Distance
+		total_elevation_gain_ft += activity.TotalElevationGain
+	}
+	total_distance_mi /= metersPerMile
+	total_elevation_gain_ft *= feetPerMeter
+	fmt.Printf("Total Distance = %.1f miles\n", total_distance_mi)
+	fmt.Printf("Total Elevation Gain = % .0f feet\n", total_elevation_gain_ft)
 }
 
 func errHandler(err error) {
@@ -119,12 +127,17 @@ func errHandler(err error) {
 	}
 }
 
-func makeRequest(url string, authContext AuthContext) (bodyBytes []byte) {
-	fmt.Println("fetching: " + url)
+func makeRequest(url string, params map[string]string, authContext AuthContext) (bodyBytes []byte) {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
 	errHandler(err)
 	req.Header.Add("Authorization", ("Bearer " + authContext.AccessToken))
+	q := req.URL.Query()
+	for key, value := range params {
+		q.Add(key, value)
+	}
+	req.URL.RawQuery = q.Encode()
+	fmt.Println("fetching: " + req.URL.RawQuery)
 	resp, err := client.Do(req)
 	errHandler(err)
 
@@ -136,13 +149,31 @@ func makeRequest(url string, authContext AuthContext) (bodyBytes []byte) {
 
 func getActivityData(authContext AuthContext) (activities []Activity) {
 	// Get Activity data
-	username := authContext.Athlete.Username
-	athlete_id := fmt.Sprintf("%.0f", authContext.Athlete.Id)
-	fmt.Println("Getting activity data for " + username + " (" + athlete_id + ")")
+	fmt.Printf("Getting activity data for %s (%.0f)\n", authContext.Athlete.Username, authContext.Athlete.Id)
 	url := baseUrl + "/athlete/activities"
-	bodyBytes := makeRequest(url, authContext)
-	err := json.Unmarshal(bodyBytes, &activities)
-	errHandler(err)
+
+	// Pagination
+	params := make(map[string]string)
+	params["per_page"] = strconv.Itoa(activitiesPerPage)
+	for page := 1; true; page++ {
+		params["page"] = strconv.Itoa(page)
+		bodyBytes := makeRequest(url, params, authContext)
+		if len(bodyBytes) == 0 {
+			break
+		}
+		var batch []Activity
+		err := json.Unmarshal(bodyBytes, &batch)
+		errHandler(err)
+		fmt.Printf("page %d: fetched %d activities.\n", page, len(batch))
+		for _, activity := range batch {
+			if activity.Type == "Ride" {
+				activities = append(activities, activity)
+			}
+		}
+		if len(batch) < activitiesPerPage {
+			break
+		}
+	}
 	return
 }
 
