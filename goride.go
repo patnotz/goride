@@ -9,8 +9,10 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
+	"text/template"
 )
 
 const baseUrl = "https://www.strava.com/api/v3"
@@ -36,10 +38,20 @@ type AuthContext struct {
 	Athlete      AthleteData
 }
 
+type Gear struct {
+	Id          string
+	Name        string
+	BrandName   string `json:"brand_name"`
+	ModelName   string `json:"model_name"`
+	Description string
+}
+
+// All units are metric, per the native Strava API.
 type Activity struct {
 	Name               string
 	Distance           float64
 	MovingTime         float64 `json:"moving_time"`
+	ElapsedTime        float64 `json:"elapsed_time"`
 	TotalElevationGain float64 `json:"total_elevation_gain"`
 	Type               string
 	Id                 float64
@@ -48,8 +60,21 @@ type Activity struct {
 	Timezone           string
 	UtcOffset          float64 `json:"utc_offset"`
 	GearId             string  `json:"gear_id"`
+	GearName           string
 	Kilojoules         float64
 	SufferScore        float64 `json:"suffer_score"`
+	AverageWatts       float64 `json:"average_watts"`
+	MaxWatts           float64 `json:"max_watts"`
+	AverageHeartrate   float64 `json:"average_heartrate"`
+	MaxHeartrate       float64 `json:"max_heartrate"`
+}
+
+func MetersToMiles(meters float64) float64 {
+	return meters / metersPerMile
+}
+
+func MetersToFeet(meters float64) float64 {
+	return meters * feetPerMeter
 }
 
 func printBytesAsStringMap(b []byte) {
@@ -103,13 +128,18 @@ func welcomeHandler(w http.ResponseWriter, req *http.Request) {
 
 	activities := getActivityData(authContext)
 	fmt.Printf("Found %d Rides:\n", len(activities))
+	tmpl, err := template.New("ride").Parse(
+		"{{range .}}{{ .Name}} - {{.Distance | printf \"%.2f\"}} on {{.GearName}}\n{{end}}")
+	errHandler(err)
+	err = tmpl.Execute(os.Stdout, activities)
+	errHandler(err)
 	total_distance_mi := 0.0
 	total_elevation_gain_ft := 0.0
-	for i, activity := range activities {
-		name := activity.Name
-		dist_mi := activity.Distance / metersPerMile
-		elev_ft := activity.TotalElevationGain * feetPerMeter
-		fmt.Printf("%3d. %s - %.2f miles, %.0f ft\n", i, name, dist_mi, elev_ft)
+	for _, activity := range activities {
+		// name := activity.Name
+		// dist_mi := activity.Distance / metersPerMile
+		// elev_ft := activity.TotalElevationGain * feetPerMeter
+		// fmt.Printf("%3d. %s - %.2f miles, %.0f ft\n", i, name, dist_mi, elev_ft)
 		total_distance_mi += activity.Distance
 		total_elevation_gain_ft += activity.TotalElevationGain
 	}
@@ -137,7 +167,7 @@ func makeRequest(url string, params map[string]string, authContext AuthContext) 
 		q.Add(key, value)
 	}
 	req.URL.RawQuery = q.Encode()
-	fmt.Println("fetching: " + req.URL.RawQuery)
+	fmt.Println("fetching:", req.URL)
 	resp, err := client.Do(req)
 	errHandler(err)
 
@@ -153,6 +183,7 @@ func getActivityData(authContext AuthContext) (activities []Activity) {
 	url := baseUrl + "/athlete/activities"
 
 	// Pagination
+	gearMap := make(map[string]Gear)
 	params := make(map[string]string)
 	params["per_page"] = strconv.Itoa(activitiesPerPage)
 	for page := 1; true; page++ {
@@ -166,14 +197,31 @@ func getActivityData(authContext AuthContext) (activities []Activity) {
 		errHandler(err)
 		fmt.Printf("page %d: fetched %d activities.\n", page, len(batch))
 		for _, activity := range batch {
-			if activity.Type == "Ride" {
-				activities = append(activities, activity)
+			if activity.Type != "Ride" {
+				continue
 			}
+			gear, found := gearMap[activity.GearId]
+			if !found {
+				gear = getGearData(authContext, activity.GearId)
+				gearMap[activity.GearId] = gear
+			}
+			activity.GearName = gear.Name
+			activities = append(activities, activity)
 		}
 		if len(batch) < activitiesPerPage {
 			break
 		}
 	}
+	return
+}
+
+func getGearData(authContext AuthContext, gearId string) (gear Gear) {
+	url := baseUrl + "/gear/" + gearId
+	params := make(map[string]string)
+	bodyBytes := makeRequest(url, params, authContext)
+	err := json.Unmarshal(bodyBytes, &gear)
+	errHandler(err)
+	fmt.Println("Gear:", gear)
 	return
 }
 
