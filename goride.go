@@ -128,8 +128,13 @@ func welcomeHandler(w http.ResponseWriter, req *http.Request) {
 
 	activities := getActivityData(authContext)
 	fmt.Printf("Found %d Rides:\n", len(activities))
-	tmpl, err := template.New("ride").Parse(
-		"{{range .}}{{ .Name}} - {{.Distance | printf \"%.2f\"}} on {{.GearName}}\n{{end}}")
+	funcMap := template.FuncMap{
+		"m_to_mi": MetersToMiles,
+		"m_to_ft": MetersToFeet,
+	}
+	tmpl, err := template.New("ride").
+		Funcs(funcMap).
+		Parse("{{range .}}{{ .Name}} - {{.Distance | m_to_mi | printf \"%.1fmi\"}} & {{.TotalElevationGain | m_to_ft | printf \"%.0fft\"}}\n{{end}}")
 	errHandler(err)
 	err = tmpl.Execute(os.Stdout, activities)
 	errHandler(err)
