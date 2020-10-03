@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Welcome, {{ .Athlete.FirstName }}!</title>
+</head>
+<body>
+Welcome, {{ .Athlete.FirstName }}!
+
+<p>
+
+Try again: <a href="https://localhost:9000/auth">Re-authenticate</a>
+</p>
+
+<table>
+{{ range .History }}
+<tr>
+	<td>{{ .Activity.StartDateLocal }}</td>
+	<td>{{ .Activity.Name }}</td>
+	<td>{{ .Activity.Distance           | m_to_mi | printf "%.1fmi" }}</td>
+	<td>{{ .Activity.TotalElevationGain | m_to_ft | printf "%.0fft" }}</td>
+	<td>{{ .CumulativeDistance          | m_to_mi | printf "%.1fmi" }}</td>
+	<td>{{ .CumulativeElevation         | m_to_mi | printf "%.1fmi" }}</td>
+</tr>
+{{ end }}
+
+</table>
+</body>
+</html>

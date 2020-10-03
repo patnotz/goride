@@ -9,7 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"os"
+	// "os"
 	"strconv"
 	"strings"
 	"text/template"
@@ -38,7 +38,7 @@ type AuthContext struct {
 	Athlete      AthleteData
 }
 
-type Gear struct {
+type GearData struct {
 	Id          string
 	Name        string
 	BrandName   string `json:"brand_name"`
@@ -47,7 +47,7 @@ type Gear struct {
 }
 
 // All units are metric, per the native Strava API.
-type Activity struct {
+type ActivityData struct {
 	Name               string
 	Distance           float64
 	MovingTime         float64 `json:"moving_time"`
@@ -67,6 +67,19 @@ type Activity struct {
 	MaxWatts           float64 `json:"max_watts"`
 	AverageHeartrate   float64 `json:"average_heartrate"`
 	MaxHeartrate       float64 `json:"max_heartrate"`
+}
+
+type HistoryData struct {
+	Activity             ActivityData
+	CumulativeDistance   float64
+	CumulativeElevation  float64
+	CumulativeMovingTime float64
+	CumulativeKilojoules float64
+}
+
+type UserData struct {
+	Athlete AthleteData
+	History []HistoryData
 }
 
 func MetersToMiles(meters float64) float64 {
@@ -98,11 +111,18 @@ func authHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func welcomeHandler(w http.ResponseWriter, req *http.Request) {
+	funcMap := template.FuncMap{
+		"m_to_mi": MetersToMiles,
+		"m_to_ft": MetersToFeet,
+	}
+	tmpl := template.Must(template.New("welcome.html").
+		Funcs(funcMap).
+		ParseFiles("welcome.html"))
+
 	dat, err := url.ParseQuery(req.URL.RawQuery)
 	errHandler(err)
 	authCode := dat["code"][0]
 	fmt.Println("Your authorization code is", authCode)
-
 	clientSecret := readClientSecret()
 
 	fmt.Println("Fetching auth tokens...")
@@ -122,36 +142,33 @@ func welcomeHandler(w http.ResponseWriter, req *http.Request) {
 	s, _ := json.MarshalIndent(authContext, "", "\t")
 	fmt.Println(string(s))
 
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	link := "https://localhost:9000/auth"
-	fmt.Fprint(w, "<html><body>Try again: <a href=\""+link+"\"/><b>"+link+"</b></a></body></html>")
-
+	var userData UserData
+	userData.Athlete = authContext.Athlete
 	activities := getActivityData(authContext)
-	fmt.Printf("Found %d Rides:\n", len(activities))
-	funcMap := template.FuncMap{
-		"m_to_mi": MetersToMiles,
-		"m_to_ft": MetersToFeet,
+	fmt.Printf("Found %d Rides.\n", len(activities))
+
+	cumulativeDistance := 0.0
+	cumulativeElevation := 0.0
+	cumulativeMovingTime := 0.0
+	cumulativeKilojoules := 0.0
+	for i := len(activities) - 1; i >= 0; i-- {
+		activity := activities[i]
+		cumulativeDistance += activity.Distance
+		cumulativeElevation += activity.TotalElevationGain
+		cumulativeMovingTime += activity.MovingTime
+		cumulativeKilojoules += activity.Kilojoules
+		var history HistoryData
+		history.Activity = activity
+		history.CumulativeDistance = cumulativeDistance
+		history.CumulativeElevation = cumulativeElevation
+		history.CumulativeMovingTime = cumulativeMovingTime
+		history.CumulativeKilojoules = cumulativeKilojoules
+		userData.History = append(userData.History, history)
 	}
-	tmpl, err := template.New("ride").
-		Funcs(funcMap).
-		Parse("{{range .}}{{ .Name}} - {{.Distance | m_to_mi | printf \"%.1fmi\"}} & {{.TotalElevationGain | m_to_ft | printf \"%.0fft\"}}\n{{end}}")
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	err = tmpl.Execute(w, userData)
 	errHandler(err)
-	err = tmpl.Execute(os.Stdout, activities)
-	errHandler(err)
-	total_distance_mi := 0.0
-	total_elevation_gain_ft := 0.0
-	for _, activity := range activities {
-		// name := activity.Name
-		// dist_mi := activity.Distance / metersPerMile
-		// elev_ft := activity.TotalElevationGain * feetPerMeter
-		// fmt.Printf("%3d. %s - %.2f miles, %.0f ft\n", i, name, dist_mi, elev_ft)
-		total_distance_mi += activity.Distance
-		total_elevation_gain_ft += activity.TotalElevationGain
-	}
-	total_distance_mi /= metersPerMile
-	total_elevation_gain_ft *= feetPerMeter
-	fmt.Printf("Total Distance = %.1f miles\n", total_distance_mi)
-	fmt.Printf("Total Elevation Gain = % .0f feet\n", total_elevation_gain_ft)
 }
 
 func errHandler(err error) {
@@ -172,7 +189,7 @@ func makeRequest(url string, params map[string]string, authContext AuthContext) 
 		q.Add(key, value)
 	}
 	req.URL.RawQuery = q.Encode()
-	fmt.Println("fetching:", req.URL)
+	fmt.Println("getting:", req.URL)
 	resp, err := client.Do(req)
 	errHandler(err)
 
@@ -182,22 +199,20 @@ func makeRequest(url string, params map[string]string, authContext AuthContext) 
 	return
 }
 
-func getActivityData(authContext AuthContext) (activities []Activity) {
-	// Get Activity data
-	fmt.Printf("Getting activity data for %s (%.0f)\n", authContext.Athlete.Username, authContext.Athlete.Id)
+func getActivityData(authContext AuthContext) (activities []ActivityData) {
 	url := baseUrl + "/athlete/activities"
 
-	// Pagination
-	gearMap := make(map[string]Gear)
+	gearMap := make(map[string]GearData)
 	params := make(map[string]string)
 	params["per_page"] = strconv.Itoa(activitiesPerPage)
+	// Pagination
 	for page := 1; true; page++ {
 		params["page"] = strconv.Itoa(page)
 		bodyBytes := makeRequest(url, params, authContext)
 		if len(bodyBytes) == 0 {
 			break
 		}
-		var batch []Activity
+		var batch []ActivityData
 		err := json.Unmarshal(bodyBytes, &batch)
 		errHandler(err)
 		fmt.Printf("page %d: fetched %d activities.\n", page, len(batch))
@@ -220,13 +235,11 @@ func getActivityData(authContext AuthContext) (activities []Activity) {
 	return
 }
 
-func getGearData(authContext AuthContext, gearId string) (gear Gear) {
+func getGearData(authContext AuthContext, gearId string) (gear GearData) {
 	url := baseUrl + "/gear/" + gearId
-	params := make(map[string]string)
-	bodyBytes := makeRequest(url, params, authContext)
+	bodyBytes := makeRequest(url, make(map[string]string), authContext)
 	err := json.Unmarshal(bodyBytes, &gear)
 	errHandler(err)
-	fmt.Println("Gear:", gear)
 	return
 }
 
