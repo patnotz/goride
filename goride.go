@@ -5,14 +5,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
-	// "os"
 	"strconv"
 	"strings"
-	"text/template"
 )
 
 const baseUrl = "https://www.strava.com/api/v3"
@@ -152,7 +151,7 @@ func welcomeHandler(w http.ResponseWriter, req *http.Request) {
 	cumulativeMovingTime := 0.0
 	cumulativeKilojoules := 0.0
 	for i := len(activities) - 1; i >= 0; i-- {
-		activity := activities[i]
+		activity := activities[i]	
 		cumulativeDistance += activity.Distance
 		cumulativeElevation += activity.TotalElevationGain
 		cumulativeMovingTime += activity.MovingTime
