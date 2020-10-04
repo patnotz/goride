@@ -106,7 +106,7 @@ func readClientSecret() (clientSecret string) {
 func authHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	url := authUrl + "?client_id=53956&response_type=code&scope=activity:read_all&redirect_uri=https://localhost:9000/welcome"
-	fmt.Fprint(w, "<html><body>Click <a href=\""+url+"\"><b>here</b></a> to Authenticate.</body></html>")
+	fmt.Fprint(w, "<html><body><a href=\""+url+"\"><img src=\"btn_strava_connectwith_orange.png\" alt=\"Connect with Stava\"/></a></body></html>")
 }
 
 func welcomeHandler(w http.ResponseWriter, req *http.Request) {
@@ -243,14 +243,9 @@ func getGearData(authContext AuthContext, gearId string) (gear GearData) {
 }
 
 func main() {
-
-	// handle '/' route
-	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
-		// username, athlete_id := getAthleteData()
-		// fmt.Fprint(res, "Go Ride, "+username+" ("+athlete_id+")!")
-	})
 	http.HandleFunc("/auth", authHandler)
 	http.HandleFunc("/welcome", welcomeHandler)
+	http.Handle("/", http.FileServer(http.Dir("./static")))
 
 	// run the server on port 9000
 	log.Fatal(http.ListenAndServeTLS(":9000", "goride.crt", "goride.key", nil))
