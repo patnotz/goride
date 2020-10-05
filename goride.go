@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const baseUrl = "https://www.strava.com/api/v3"
@@ -68,6 +69,15 @@ type ActivityData struct {
 	MaxWatts           float64 `json:"max_watts"`
 	AverageHeartrate   float64 `json:"average_heartrate"`
 	MaxHeartrate       float64 `json:"max_heartrate"`
+}
+
+type ComponentData struct {
+	Name string
+}
+
+type ServiceEventData struct {
+	ServiceDate time.Time
+	Component   ComponentData
 }
 
 type HistoryData struct {
@@ -165,12 +175,10 @@ func welcomeHandler(w http.ResponseWriter, req *http.Request) {
 	activities := getActivityData(authContext)
 	fmt.Printf("Found %d Rides.\n", len(activities))
 
-	cumulativeDistance := 0.0
-	cumulativeElevation := 0.0
-	cumulativeMovingTime := 0.0
-	cumulativeKilojoules := 0.0
+	var cumulativeDistance, cumulativeElevation,
+		cumulativeMovingTime, cumulativeKilojoules float64
 	for i := len(activities) - 1; i >= 0; i-- {
-		activity := activities[i]	
+		activity := activities[i]
 		cumulativeDistance += activity.Distance
 		cumulativeElevation += activity.TotalElevationGain
 		cumulativeMovingTime += activity.MovingTime
