@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Welcome, {{ .Athlete.FirstName }}!</title>
+    <link rel="stylesheet" href="goride.css">
 </head>
 <body>
 Welcome, {{ .Athlete.FirstName }}!
@@ -11,18 +12,29 @@ Welcome, {{ .Athlete.FirstName }}!
 Try again: <a href="https://localhost:9000/auth">Re-authenticate</a>
 </p>
 
-<table>
+<table id="historyTable">
+	<thead>
+		<tr>
+			<th>Date</th>
+			<th>Ride Name</th>
+			<th>Distance (mi)</th>
+			<th>Elevation Gain (ft)</th>
+			<th>Cumulative Distance (mi)</th>
+			<th>Cumulative Elevation Gain (mi)</th>
+		</tr>
+	</thead>
+<tbody>
 {{ range .History }}
-<tr>
-	<td>{{ .Activity.StartDateLocal }}</td>
-	<td>{{ .Activity.Name }}</td>
-	<td>{{ .Activity.Distance           | m_to_mi | printf "%.1fmi" }}</td>
-	<td>{{ .Activity.TotalElevationGain | m_to_ft | printf "%.0fft" }}</td>
-	<td>{{ .CumulativeDistance          | m_to_mi | printf "%.1fmi" }}</td>
-	<td>{{ .CumulativeElevation         | m_to_mi | printf "%.1fmi" }}</td>
-</tr>
+	<tr>
+		<td>{{ .Activity.StartDateLocal }}</td>
+		<td>{{ .Activity.Name }}</td>
+		<td>{{ .Activity.Distance           | m_to_mi | printf "%.1f" }}</td>
+		<td>{{ .Activity.TotalElevationGain | m_to_ft | printf "%.0f" }}</td>
+		<td>{{ .CumulativeDistance          | m_to_mi | printf "%.0f" }}</td>
+		<td>{{ .CumulativeElevation         | m_to_mi | printf "%.1f" }}</td>
+	</tr>
 {{ end }}
-
+</tbody>
 </table>
 </body>
 </html>
