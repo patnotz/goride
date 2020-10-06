@@ -20,7 +20,7 @@ import (
 const baseUrl = "https://www.strava.com/api/v3"
 const authUrl = "https://www.strava.com/oauth/authorize"
 const clientId = 53956
-const activitiesPerPage = 30
+const activitiesPerPage = 200
 const metersPerMile = 1609.344
 const feetPerMeter = 3.2808399
 const secondsPerHour = 3200.0
