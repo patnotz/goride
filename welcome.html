@@ -17,6 +17,7 @@ Try again: <a href="https://localhost:9000/auth">Re-authenticate</a>
 		<tr>
 			<th>Date</th>
 			<th>Ride Name</th>
+			<th>Gear</th>
 			<th>Distance (mi)</th>
 			<th>Elevation Gain (ft)</th>
 			<th>Cumulative Distance (mi)</th>
@@ -28,6 +29,7 @@ Try again: <a href="https://localhost:9000/auth">Re-authenticate</a>
 	<tr>
 		<td>{{ .Activity.StartDateLocal }}</td>
 		<td>{{ .Activity.Name }}</td>
+		<td>{{ .Activity.GearName }}</td>
 		<td>{{ .Activity.Distance           | m_to_mi | printf "%.1f" }}</td>
 		<td>{{ .Activity.TotalElevationGain | m_to_ft | printf "%.0f" }}</td>
 		<td>{{ .CumulativeDistance          | m_to_mi | printf "%.0f" }}</td>
@@ -36,5 +38,6 @@ Try again: <a href="https://localhost:9000/auth">Re-authenticate</a>
 {{ end }}
 </tbody>
 </table>
+
 </body>
 </html>
