@@ -24,6 +24,7 @@ const activitiesPerPage = 200
 const metersPerMile = 1609.344
 const feetPerMeter = 3.2808399
 const secondsPerHour = 3200.0
+const stLayout = "January 2, 2006"
 
 type AthleteData struct {
 	FirstName string
@@ -72,14 +73,15 @@ type ActivityData struct {
 }
 
 type ComponentData struct {
-	Type string
-	Brand string
-	Model string
-	Added time.time
-	Removed time.time
+	Bike     string
+	Type     string
+	Brand    string
+	Model    string
+	Added    SimpleTime
+	Removed  SimpleTime
 	Distance float64
-	Hours float64
-	Notes string
+	Hours    float64
+	Notes    string
 }
 
 type HistoryData struct {
@@ -93,6 +95,33 @@ type HistoryData struct {
 type UserData struct {
 	Athlete AthleteData
 	History []HistoryData
+}
+
+type SimpleTime struct {
+	time.Time
+}
+
+func (st *SimpleTime) UnmarshalJSON(b []byte) (err error) {
+	s := strings.Trim(string(b), "\"")
+	if s == "null" {
+		st.Time = time.Time{}
+		return
+	}
+	st.Time, err = time.Parse(stLayout, s)
+	return
+}
+
+func (st *SimpleTime) MarshalJSON() ([]byte, error) {
+	if st.Time.UnixNano() == nilTime {
+		return []byte("null"), nil
+	}
+	return []byte(fmt.Sprintf("\"%s\"", st.Time.Format(stLayout))), nil
+}
+
+var nilTime = (time.Time{}).UnixNano()
+
+func (st *SimpleTime) IsSet() bool {
+	return st.UnixNano() != nilTime
 }
 
 func MetersToMiles(meters float64) float64 {
@@ -134,10 +163,20 @@ func readClientSecret() (clientSecret string) {
 	return
 }
 
+func readComponentsData() (components []ComponentData) {
+	contents, err := ioutil.ReadFile("components.json")
+	errHandler(err)
+	err = json.Unmarshal(contents, &components)
+	errHandler(err)
+	fmt.Println(components)
+	return
+}
+
 func authHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	url := authUrl + "?client_id=53956&response_type=code&scope=activity:read_all&redirect_uri=https://localhost:9000/welcome"
 	fmt.Fprint(w, "<html><body><a href=\""+url+"\"><img src=\"btn_strava_connectwith_orange.png\" alt=\"Connect with Stava\"/></a></body></html>")
+	readComponentsData()
 }
 
 func welcomeHandler(w http.ResponseWriter, req *http.Request) {
