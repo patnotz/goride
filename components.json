@@ -1,0 +1,43 @@
+[
+{
+	"bike": "Fuel EX",
+    "type": "Chain",
+    "added": "May 30, 2020"
+},
+{
+	"bike": "Fuel EX",
+    "type": "Front Tire",
+    "brand": "Schwalbe",
+    "model": "Hans Dampf 29x2.6 Orange",
+    "added": "July 25, 2020"
+},
+{
+	"bike": "Fuel EX",
+    "type": "Read Tire",
+    "brand": "Schwalbe",
+    "model": "Hans Dampf 29x2.35 Blue",
+    "added": "July 25, 2020"
+},
+{
+	"bike": "Fuel EX",
+    "type": "Rear Brake Pads",
+    "added": "July 25, 2020"
+},
+{
+	"bike": "Fuel EX",
+    "type": "Front Brake Pads",
+    "added": "September 25, 2020"
+},
+{
+	"bike": "Fuel EX",
+    "type": "Rear Shock",
+    "added": "July 25, 2020",
+    "notes": "Shock serviced"
+},
+{
+	"bike": "Fuel EX",
+    "type": "Front Shock",
+    "added": "July 25, 2020",
+    "notes": "Shock serviced"
+}
+]

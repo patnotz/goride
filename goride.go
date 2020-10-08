@@ -72,12 +72,14 @@ type ActivityData struct {
 }
 
 type ComponentData struct {
-	Name string
-}
-
-type ServiceEventData struct {
-	ServiceDate time.Time
-	Component   ComponentData
+	Type string
+	Brand string
+	Model string
+	Added time.time
+	Removed time.time
+	Distance float64
+	Hours float64
+	Notes string
 }
 
 type HistoryData struct {
