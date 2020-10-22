@@ -17,22 +17,24 @@ import (
 	"time"
 )
 
-const baseUrl = "https://www.strava.com/api/v3"
-const authUrl = "https://www.strava.com/oauth/authorize"
-const clientId = 53956
+const clientID = 53956
 const activitiesPerPage = 200
 const metersPerMile = 1609.344
 const feetPerMeter = 3.2808399
 const secondsPerHour = 3200.0
 const stLayout = "January 2, 2006"
+const baseURL = "https://www.strava.com/api/v3"
+const authURL = "https://www.strava.com/oauth/authorize"
 
+// AthleteData contains the basic identificatin data for the logged in Athlete
 type AthleteData struct {
 	FirstName string
 	LastName  string
-	Id        float64
+	ID        float64
 	Username  string
 }
 
+// AuthContext holds the tokens and expiry info for the logged in Athlete
 type AuthContext struct {
 	AccessToken  string  `json:"access_token"`
 	RefreshToken string  `json:"refresh_token"`
@@ -41,14 +43,16 @@ type AuthContext struct {
 	Athlete      AthleteData
 }
 
+// GearData contains the data for a Strava Gear data object
 type GearData struct {
-	Id          string
+	ID          string
 	Name        string
 	BrandName   string `json:"brand_name"`
 	ModelName   string `json:"model_name"`
 	Description string
 }
 
+// ActivityData contains the data for a Strava Activity
 // All units are metric, per the native Strava API.
 type ActivityData struct {
 	Name               string
@@ -57,12 +61,12 @@ type ActivityData struct {
 	ElapsedTime        float64 `json:"elapsed_time"`
 	TotalElevationGain float64 `json:"total_elevation_gain"`
 	Type               string
-	Id                 float64
+	ID                 float64
 	StartDate          string `json:"start_time"`
 	StartDateLocal     string `json:"start_date_local"`
 	Timezone           string
 	UtcOffset          float64 `json:"utc_offset"`
-	GearId             string  `json:"gear_id"`
+	GearID             string  `json:"gear_id"`
 	GearName           string
 	Kilojoules         float64
 	SufferScore        float64 `json:"suffer_score"`
@@ -72,6 +76,7 @@ type ActivityData struct {
 	MaxHeartrate       float64 `json:"max_heartrate"`
 }
 
+// ComponentData holds detailed information about a bike component.
 type ComponentData struct {
 	Bike     string
 	Type     string
@@ -84,6 +89,7 @@ type ComponentData struct {
 	Notes    string
 }
 
+// HistoryData holds an ActivityData object and additional data about this activity history of activities up to this point.
 type HistoryData struct {
 	Activity             ActivityData
 	CumulativeDistance   float64
@@ -92,15 +98,18 @@ type HistoryData struct {
 	CumulativeKilojoules float64
 }
 
+// UserData holds all the data for an Athlete including the AthleteData and full HistoryData.
 type UserData struct {
 	Athlete AthleteData
 	History []HistoryData
 }
 
+// SimpleTime is a type for holding a Time.time value with simple formatting of JSON data.
 type SimpleTime struct {
 	time.Time
 }
 
+// UnmarshalJSON decodes a SimpleTime based on our prefered format.
 func (st *SimpleTime) UnmarshalJSON(b []byte) (err error) {
 	s := strings.Trim(string(b), "\"")
 	if s == "null" {
@@ -111,6 +120,7 @@ func (st *SimpleTime) UnmarshalJSON(b []byte) (err error) {
 	return
 }
 
+// MarshalJSON encodes a SimpleTime based on our prefered format.
 func (st *SimpleTime) MarshalJSON() ([]byte, error) {
 	if st.Time.UnixNano() == nilTime {
 		return []byte("null"), nil
@@ -120,14 +130,17 @@ func (st *SimpleTime) MarshalJSON() ([]byte, error) {
 
 var nilTime = (time.Time{}).UnixNano()
 
+// IsSet implements the IsSet method for a SimpleTime object.
 func (st *SimpleTime) IsSet() bool {
 	return st.UnixNano() != nilTime
 }
 
+// MetersToMiles converts a distance in meters to a distance in miles.
 func MetersToMiles(meters float64) float64 {
 	return meters / metersPerMile
 }
 
+// MetersToFeet converts a distance in meters to a distance in feet.
 func MetersToFeet(meters float64) float64 {
 	return meters * feetPerMeter
 }
@@ -174,7 +187,7 @@ func readComponentsData() (components []ComponentData) {
 
 func authHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	url := authUrl + "?client_id=53956&response_type=code&scope=activity:read_all&redirect_uri=https://localhost:9000/welcome"
+	url := authURL + "?client_id=53956&response_type=code&scope=activity:read_all&redirect_uri=https://localhost:9000/welcome"
 	fmt.Fprint(w, "<html><body><a href=\""+url+"\"><img src=\"btn_strava_connectwith_orange.png\" alt=\"Connect with Stava\"/></a></body></html>")
 	readComponentsData()
 }
@@ -196,9 +209,9 @@ func welcomeHandler(w http.ResponseWriter, req *http.Request) {
 
 	fmt.Println("Fetching auth tokens...")
 	client := &http.Client{}
-	resp, err := client.PostForm(baseUrl+"/oauth/token",
+	resp, err := client.PostForm(baseURL+"/oauth/token",
 		url.Values{
-			"client_id":     {fmt.Sprintf("%d", clientId)},
+			"client_id":     {fmt.Sprintf("%d", clientID)},
 			"client_secret": {clientSecret},
 			"code":          {authCode}})
 
@@ -267,7 +280,7 @@ func makeRequest(url string, params map[string]string, authContext AuthContext) 
 }
 
 func getActivityData(authContext AuthContext) (activities []ActivityData) {
-	url := baseUrl + "/athlete/activities"
+	url := baseURL + "/athlete/activities"
 
 	gearMap := make(map[string]GearData)
 	params := make(map[string]string)
@@ -287,10 +300,10 @@ func getActivityData(authContext AuthContext) (activities []ActivityData) {
 			if activity.Type != "Ride" {
 				continue
 			}
-			gear, found := gearMap[activity.GearId]
+			gear, found := gearMap[activity.GearID]
 			if !found {
-				gear = getGearData(authContext, activity.GearId)
-				gearMap[activity.GearId] = gear
+				gear = getGearData(authContext, activity.GearID)
+				gearMap[activity.GearID] = gear
 			}
 			activity.GearName = gear.Name
 			activities = append(activities, activity)
@@ -302,8 +315,8 @@ func getActivityData(authContext AuthContext) (activities []ActivityData) {
 	return
 }
 
-func getGearData(authContext AuthContext, gearId string) (gear GearData) {
-	url := baseUrl + "/gear/" + gearId
+func getGearData(authContext AuthContext, gearID string) (gear GearData) {
+	url := baseURL + "/gear/" + gearID
 	bodyBytes := makeRequest(url, make(map[string]string), authContext)
 	err := json.Unmarshal(bodyBytes, &gear)
 	errHandler(err)
