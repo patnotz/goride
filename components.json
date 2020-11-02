@@ -39,5 +39,39 @@
     "type": "Front Shock",
     "added": "July 25, 2020",
     "notes": "Shock serviced"
+},
+{
+    "bike":"Fuel EX",
+    "type": "Rear Brake Pads",
+    "added": "October 30, 2020"
+},
+{
+    "bike": "Fuel EX",
+    "type": "Rear Casette",
+    "added": "November 2, 2020",
+    "brand": "SRAM",
+    "model": "NX Eagle PG-1230 11-50 12 Speed Casette",
+    "notes": "Epicenter"
+},
+{
+    "bike": "Fuel EX",
+    "type": "Dropper Post",
+    "added": "November 2, 2020",
+    "brand": "Bontrager",
+    "notes": "Epicenter, serviced"
+},
+{
+    "bike": "Fuel EX",
+    "type": "Chain",
+    "added": "November 2, 2020",
+    "brand": "SRAM",
+    "model": "PC XX1 Eagle HollowPin Chain 126 Links PowerLock 12 Speed Black",
+    "notes": "Epicenter"
+},
+{
+    "bike": "Fuel EX",
+    "type": "Pivots",
+    "added": "November 2, 2020",
+    "notes": "Epicenter, serviced"
 }
 ]
