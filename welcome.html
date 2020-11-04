@@ -6,8 +6,7 @@
     <link rel="stylesheet" href="goride.css">
 </head>
 <body>
-Welcome, {{ .Athlete.FirstName }}!
-
+Welcome, {{ .athleteData.FirstName }}!
 <p>
 Try again: <a href="https://localhost:9000/auth">Re-authenticate</a>
 </p>
@@ -18,24 +17,39 @@ Try again: <a href="https://localhost:9000/auth">Re-authenticate</a>
 			<th>Date</th>
 			<th>Ride Name</th>
 			<th>Gear</th>
-			<th>Distance (mi)</th>
-			<th>Elevation Gain (ft)</th>
-			<th>Cumulative Distance (mi)</th>
-			<th>Cumulative Elevation Gain (mi)</th>
+			<th>Distance</th>
+			<th>Moving Time</th>
+			<th>Elevation Gain</th>
+			<th>Cumulative Distance</th>
+			<th>Cumulative Elevation Gain</th>
+			<th>Cumulative Moving Time</th>
+			{{ with .compTypes }}
+			{{ range $k, $v := . }}
+			<th>{{ $k }}</th>
+			{{ end }}
+			{{ end }}
 		</tr>
 	</thead>
 <tbody>
-{{ range .History }}
+	{{ range $i, $h := $.historyData }}
 	<tr>
-		<td>{{ .Activity.StartDateLocal }}</td>
-		<td>{{ .Activity.Name }}</td>
-		<td>{{ .Activity.GearName }}</td>
-		<td>{{ .Activity.Distance           | m_to_mi | printf "%.1f" }}</td>
-		<td>{{ .Activity.TotalElevationGain | m_to_ft | printf "%.0f" }}</td>
-		<td>{{ .CumulativeDistance          | m_to_mi | printf "%.0f" }}</td>
-		<td>{{ .CumulativeElevation         | m_to_mi | printf "%.1f" }}</td>
+		<td>{{ $h.Activity.StartDateLocal }}</td>
+		<td>{{ $h.Activity.Name }}</td>
+		<td>{{ $h.Activity.GearName }}</td>
+		<td>{{ $h.Activity.Distance           | m_to_mi | printf "%.1f" }} mi</td>
+		<td>{{ $h.Activity.MovingTime         | s_to_h  | printf "%.1f" }} h</td>
+		<td>{{ $h.Activity.TotalElevationGain | m_to_ft | printf "%.0f" }} ft</td>
+		<td>{{ $h.CumulativeDistance          | m_to_mi | printf "%.0f" }} mi</td>
+		<td>{{ $h.CumulativeElevation         | m_to_ft | printf "%.0f" }} ft</td>
+		<td>{{ $h.CumulativeMovingTime        | s_to_h  | printf "%.0f" }} h</td>
+		{{ range $k, $v := $.compTypes }}
+		<td>
+			{{ index $h.GearDistance $k | m_to_mi | printf "%.0f"}} mi /
+			{{ index $h.GearTime     $k | s_to_h  | printf "%.0f"}} h
+		</td>
+		{{ end }}
 	</tr>
-{{ end }}
+	{{ end }}
 </tbody>
 </table>
 

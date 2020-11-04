@@ -22,9 +22,13 @@ const activitiesPerPage = 200
 const metersPerMile = 1609.344
 const feetPerMeter = 3.2808399
 const secondsPerHour = 3200.0
-const stLayout = "January 2, 2006"
 const baseURL = "https://www.strava.com/api/v3"
 const authURL = "https://www.strava.com/oauth/authorize"
+const componentsLog = "components.json"
+
+// Time layouts, expressed as examples for: Mon Jan 2 15:04:05 MST 2006
+const stLayout = "January 2, 2006"
+const stravaLayout = "2006-01-02T15:04:05Z"
 
 // AthleteData contains the basic identificatin data for the logged in Athlete
 type AthleteData struct {
@@ -85,7 +89,7 @@ type ComponentData struct {
 	Added    SimpleTime
 	Removed  SimpleTime
 	Distance float64
-	Hours    float64
+	Time     float64
 	Notes    string
 }
 
@@ -96,12 +100,8 @@ type HistoryData struct {
 	CumulativeElevation  float64
 	CumulativeMovingTime float64
 	CumulativeKilojoules float64
-}
-
-// UserData holds all the data for an Athlete including the AthleteData and full HistoryData.
-type UserData struct {
-	Athlete AthleteData
-	History []HistoryData
+	GearDistance         map[string]float64
+	GearTime             map[string]float64
 }
 
 // SimpleTime is a type for holding a Time.time value with simple formatting of JSON data.
@@ -145,6 +145,11 @@ func MetersToFeet(meters float64) float64 {
 	return meters * feetPerMeter
 }
 
+// SecondsToHours converts a time in seconds to a time in hours.
+func SecondsToHours(seconds float64) float64 {
+	return seconds / secondsPerHour
+}
+
 func printBytesAsStringMap(b []byte) {
 	var m map[string]interface{}
 	err := json.Unmarshal(b, &m)
@@ -177,11 +182,14 @@ func readClientSecret() (clientSecret string) {
 }
 
 func readComponentsData() (components []ComponentData) {
-	contents, err := ioutil.ReadFile("components.json")
+	fmt.Println("Reading", componentsLog)
+	contents, err := ioutil.ReadFile(componentsLog)
 	errHandler(err)
 	err = json.Unmarshal(contents, &components)
 	errHandler(err)
-	fmt.Println(components)
+	for _, component := range components {
+		fmt.Println(component)
+	}
 	return
 }
 
@@ -189,13 +197,13 @@ func authHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	url := authURL + "?client_id=53956&response_type=code&scope=activity:read_all&redirect_uri=https://localhost:9000/welcome"
 	fmt.Fprint(w, "<html><body><a href=\""+url+"\"><img src=\"btn_strava_connectwith_orange.png\" alt=\"Connect with Stava\"/></a></body></html>")
-	readComponentsData()
 }
 
 func welcomeHandler(w http.ResponseWriter, req *http.Request) {
 	funcMap := template.FuncMap{
 		"m_to_mi": MetersToMiles,
 		"m_to_ft": MetersToFeet,
+		"s_to_h":  SecondsToHours,
 	}
 	tmpl := template.Must(template.New("welcome.html").
 		Funcs(funcMap).
@@ -224,11 +232,16 @@ func welcomeHandler(w http.ResponseWriter, req *http.Request) {
 	s, _ := json.MarshalIndent(authContext, "", "\t")
 	fmt.Println(string(s))
 
-	var userData UserData
-	userData.Athlete = authContext.Athlete
 	activities := getActivityData(authContext)
 	fmt.Printf("Found %d Rides.\n", len(activities))
 
+	componentsData := readComponentsData()
+	compTypes := make(map[string]bool)
+	for _, c := range componentsData {
+		compTypes[c.Type] = true
+	}
+
+	var History []HistoryData
 	var cumulativeDistance, cumulativeElevation,
 		cumulativeMovingTime, cumulativeKilojoules float64
 	for i := len(activities) - 1; i >= 0; i-- {
@@ -237,17 +250,36 @@ func welcomeHandler(w http.ResponseWriter, req *http.Request) {
 		cumulativeElevation += activity.TotalElevationGain
 		cumulativeMovingTime += activity.MovingTime
 		cumulativeKilojoules += activity.Kilojoules
-		var history HistoryData
-		history.Activity = activity
-		history.CumulativeDistance = cumulativeDistance
-		history.CumulativeElevation = cumulativeElevation
-		history.CumulativeMovingTime = cumulativeMovingTime
-		history.CumulativeKilojoules = cumulativeKilojoules
-		userData.History = append(userData.History, history)
+		var hd HistoryData
+		hd.Activity = activity
+		hd.CumulativeDistance = cumulativeDistance
+		hd.CumulativeElevation = cumulativeElevation
+		hd.CumulativeMovingTime = cumulativeMovingTime
+		hd.CumulativeKilojoules = cumulativeKilojoules
+		startTime, err := time.Parse(stravaLayout, activity.StartDateLocal)
+		errHandler(err)
+		hd.GearDistance = make(map[string]float64)
+		hd.GearTime = make(map[string]float64)
+		for i := range componentsData {
+			comp := &componentsData[i]
+			startedAfterAdded := (*comp).Added.Time == time.Time{} || startTime.After((*comp).Added.Time)
+			startedBeforeRemoved := (*comp).Removed.Time == time.Time{} || startTime.Before((*comp).Removed.Time)
+			if startedAfterAdded && startedBeforeRemoved {
+				compType := (*comp).Type
+				(*comp).Distance += activity.Distance
+				(*comp).Time += activity.MovingTime
+				hd.GearDistance[compType] = (*comp).Distance
+				hd.GearTime[compType] = (*comp).Time
+			}
+		}
+		History = append(History, hd)
 	}
-
+	m := make(map[string]interface{})
+	m["historyData"] = History
+	m["athleteData"] = authContext.Athlete
+	m["compTypes"] = compTypes
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	err = tmpl.Execute(w, userData)
+	err = tmpl.Execute(w, m)
 	errHandler(err)
 }
 
