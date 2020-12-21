@@ -25,6 +25,9 @@ const secondsPerHour = 3200.0
 const baseURL = "https://www.strava.com/api/v3"
 const authURL = "https://www.strava.com/oauth/authorize"
 const componentsLog = "components.json"
+const hostDomain = "penguin.linux.test"
+const hostPort = "9000"
+const authPage = "https://" + hostDomain + ":" + hostPort + "/auth"
 
 // Time layouts, expressed as examples for: Mon Jan 2 15:04:05 MST 2006
 const stLayout = "January 2, 2006"
@@ -195,7 +198,7 @@ func readComponentsData() (components []ComponentData) {
 
 func authHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	url := authURL + "?client_id=53956&response_type=code&scope=activity:read_all&redirect_uri=https://localhost:9000/welcome"
+	url := fmt.Sprintf("%s?client_id=%d&response_type=code&scope=activity:read_all&redirect_uri=https://%s:%s/welcome", authURL, clientID, hostDomain, hostPort)
 	fmt.Fprint(w, "<html><body><a href=\""+url+"\"><img src=\"btn_strava_connectwith_orange.png\" alt=\"Connect with Stava\"/></a></body></html>")
 }
 
@@ -278,6 +281,7 @@ func welcomeHandler(w http.ResponseWriter, req *http.Request) {
 	m["historyData"] = History
 	m["athleteData"] = authContext.Athlete
 	m["compTypes"] = compTypes
+	m["authPage"] = authPage
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	err = tmpl.Execute(w, m)
 	errHandler(err)
@@ -360,6 +364,6 @@ func main() {
 	http.HandleFunc("/welcome", welcomeHandler)
 	http.Handle("/", http.FileServer(http.Dir("./static")))
 
-	// run the server on port 9000
-	log.Fatal(http.ListenAndServeTLS(":9000", "goride.crt", "goride.key", nil))
+	fmt.Println("Serving on", authPage)
+	log.Fatal(http.ListenAndServeTLS(":"+hostPort, "goride.crt", "goride.key", nil))
 }

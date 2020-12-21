@@ -8,7 +8,7 @@
 <body>
 Welcome, {{ .athleteData.FirstName }}!
 <p>
-Try again: <a href="https://localhost:9000/auth">Re-authenticate</a>
+Try again: <a href="{{ .authPage }}">Re-authenticate</a>
 </p>
 
 <table id="historyTable">
